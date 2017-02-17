@@ -1,6 +1,6 @@
 import os
 import sys
-import readVCF
+#import readVCF
 import itertools
 
 def get_sam_data(line):
@@ -21,7 +21,7 @@ def get_sam_data(line):
     return(sam)
 
 def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir):
-    prefix=working_dir + "/" bam[0:-4]
+    prefix=working_dir + "/" +  bam[0:-4]
     #print "samtools view {} {}:{}-{} | grep \"SA:\" | grep -E :{},|;{}, > test.sam".format(bam,chrA,startA,stopA,chrB,chrB)
     os.system("samtools view {} {}:{}-{} | grep \"SA:\" | grep -E \":{},|;{},\"  > {}_test.sam".format(bam,chrA,0,stopA,chrB,chrB,prefix))
     #os.system("samtools view {} {}:{}-{} > test.sam".format(bam,chrA,start,stopA))
