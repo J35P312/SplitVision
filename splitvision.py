@@ -151,6 +151,7 @@ def retrieve_pos(args,input_file):
             if orientationB != orientationA:
                 for i in range(0,len(range_secondary)):
                     range_secondary[i]=len(contig)+1-range_secondary[i]
+                range_secondary=sorted(range_secondary)
 
             homology=len( set(range_primary).intersection(set(range_secondary))  )
 
@@ -161,7 +162,23 @@ def retrieve_pos(args,input_file):
             contigB=""
             reverse_comp={"A":"T","a":"t","T":"A","t":"a","G":"C","g":"c","C":"G","c":"g"}
             for i in range(0,len(range_secondary)):
-                contigB += contig[range_secondary[i]-1]       
+                contigB += contig[range_secondary[i]-1]
+
+            if orientationA == "-":
+                tmpA=""
+                for i in range(0,len(contigA)):
+                    tmpA += reverse_comp[contigA[len(contigA) -i-1 ] ]
+                contigA=tmpA
+                tmpContig=""
+                for i in range(0,len(contig)):
+                    tmpContig += reverse_comp[contig[len(contig)-i-1]]
+                contig = tmpContig
+            if orientationB == "-":
+                tmpB=""
+                for i in range(0,len(contigB)):
+                   tmpB += reverse_comp[contigB[len(contigB)-i-1]]
+                contigB=tmpB             
+ 
             sucess = True
             break
 
@@ -266,6 +283,6 @@ def extract_splits(args):
 
         print"{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(args.sample,var_id,splits,args.chrA,args.posA,args.orientationA,args.chrB,args.posB,args.orientationB,bp_homology,insertions,deletions,args.lengthA,args.lengthB,len(contig),args.regionA,args.regionB,contig).strip()
 
-header=["sampleID","variant_id","split_reads","ChrA","PosA","OrientationA","ChrB","PosB","OrientationB","breakpoint_homology(bp)","insertions","deletions","regionA_sequence","regionB_sequwnce","lengthA","lengthB","contig_length","contig_sequence"]
+header=["sampleID","variant_id","split_reads","ChrA","PosA","OrientationA","ChrB","PosB","OrientationB","breakpoint_homology(bp)","insertions","deletions","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
 print "\t".join(header)      
 detected_splits=extract_splits(args)
