@@ -5,6 +5,14 @@ SplitVision accepts an SV vcf file or bedpe file, as well as a bam file. SplitVi
 
 command:
 
-python splitvision.py --vcf input.vcf --bam input.bam
+python splitvision.py --vcf input.vcf --bam input.bam --fa ref.fasta
 
 A tab separated table will be printed to stdout
+
+SplitVision requires:
+
+    ABYSS
+    BWA
+    samtools
+
+the reference fasta needs to be indexed using bwa.

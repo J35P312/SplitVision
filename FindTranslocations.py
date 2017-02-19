@@ -20,10 +20,11 @@ def get_sam_data(line):
     sam={"ID":content[0],"chr":content[2],"start":start,"end": end,"Q":int(content[4]),"CIGAR":content[5],"length":length}
     return(sam)
 
-def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir):
-    prefix=working_dir + "/" +  bam[0:-4]
+def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir,it):
+    bam_prefix=bam.split("/")[-1]
+    prefix=working_dir + "/" +  bam_prefix[0:-4]
     #print "samtools view {} {}:{}-{} | grep \"SA:\" | grep -E :{},|;{}, > test.sam".format(bam,chrA,startA,stopA,chrB,chrB)
-    os.system("samtools view {} {}:{}-{} | grep \"SA:\" | grep -E \":{},|;{},\"  > {}_test.sam".format(bam,chrA,0,stopA,chrB,chrB,prefix))
+    os.system("samtools view {} {}:{}-{} | grep \"SA:\" | grep -E \":{},|;{},\"  > {}_test.sam".format(bam,chrA,startA,stopA,chrB,chrB,prefix))
     #os.system("samtools view {} {}:{}-{} > test.sam".format(bam,chrA,start,stopA))
 
     sam_gamwise=[]
@@ -50,7 +51,6 @@ def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir):
         
     found = False
     for line in sam_gamwise:
-        
         if not "\tSA:Z" in line:
            continue
         SA_line=line.strip().split("SA:Z:")[-1].split("\t")[0]
@@ -60,10 +60,12 @@ def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir):
             split_read=SA.split(",")
             #print split_read
             pos = int(split_read[1])
+            #print  "{} {} {}".format(pos,startB,stopB)
             if split_read[0] == chrB and pos >= startB and pos <= stopB:
                 found = True
-                return found
-            
+                splits.append(line.strip() +"\n")
+                continue
+           
             SC = ["".join(x) for _, x in itertools.groupby(SA, key=str.isdigit)]
             length=0
             for i in range(0,len(SC)/2):
@@ -81,9 +83,14 @@ def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir):
     for line in splits:
         target.write(line)
     target.close()
-
-    os.system("cat {}_header.sam {}/splits.sam | samtools view -Shb - > {}/splits.bam".format(prefix,working_dir,working_dir  ))
-    os.system("samtools bam2fq {} > {}/splits.fastq".format(working_dir,working_dir) )
+    if it == 1:
+       os.system("cat {}_header.sam {}/splits.sam | samtools view -Shb - > {}/splits_1.bam".format(prefix,working_dir,working_dir  ))
+    elif it == 2:
+       os.system("cat {}_header.sam {}/splits.sam | samtools view -Shb - > {}/splits_2.bam".format(prefix,working_dir,working_dir  ))
+       os.system("samtools merge -f {}/splits.bam {}/splits_1.bam {}/splits_2.bam".format(working_dir, working_dir, working_dir))
+       os.system("samtools bam2fq {}/splits.bam > {}/splits.fq".format(working_dir,working_dir))
+       os.system("samtools view {}/splits.bam > {}/splits.sam".format(working_dir,working_dir))
+    #os.system("samtools bam2fq {}/splits.bam > {}/splits.fastq".format(working_dir,working_dir) )
     return found
 
 def main(args):
@@ -100,10 +107,12 @@ def main(args):
     startB= args.posB - padding
     stopB= args.posB + padding
     working_dir=os.path.join(os.path.join(args.working_dir, args.id ))
-    found=find_variants(args.bam,chrA,startA,stopA,chrB,startB,stopB,working_dir)
+    found=find_variants(args.bam,chrA,startA,stopA,chrB,startB,stopB,working_dir,1)
     if not found:
-        found =find_variants(args.bam,chrB,startB,stopB,chrA,startA,stopA,working_dir)
+        #print 1
+        found =find_variants(args.bam,chrB,startB,stopB,chrA,startA,stopA,working_dir,2)
     else:
-        tmp =find_variants(args.bam,chrB,startB,stopB,chrA,startA,stopA,working_dir)
+       # print 2
+        tmp =find_variants(args.bam,chrB,startB,stopB,chrA,startA,stopA,working_dir,2)
 
     return found  
