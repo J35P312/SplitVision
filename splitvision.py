@@ -2,7 +2,7 @@ import argparse
 import FindTranslocations
 import itertools
 import os
-
+import xlwt
 parser = argparse.ArgumentParser("""SplitVision - SV breakpoint analysis software""")
 parser.add_argument('--vcf'        , type=str, help="input vcf file containing breakpoints of interest(use only bed or vcf at a time)")
 parser.add_argument('--bed', type=str, help="input bed file(tab separted) containing the sv breakpoints(format: chrA,posA,chrB,posB)")
@@ -154,7 +154,20 @@ def retrieve_pos(args,input_file):
                 range_secondary=sorted(range_secondary)
 
             homology=len( set(range_primary).intersection(set(range_secondary))  )
+            homology_seq=""
+            homologous_pos=sorted(list(set(range_primary).intersection(set(range_secondary))))
+            for i in range(0,len(homologous_pos)):
+                if i == len(homologous_pos) -1:
+                    homology_seq +=   contig[ homologous_pos[i]-1 ]
+                else:
+                    if homologous_pos[i] +1 == homologous_pos[i+1]:
+                        homology_seq +=   contig[ homologous_pos[i]-1 ]
+                    else:
+                        homology_seq +=   contig[ homologous_pos[i]-1 ]  + ","                    
 
+
+
+            insertion_seq=""
             contigA=""
             for i in range(0,len(range_primary)):
                 contigA += contig[range_primary[i]-1]
@@ -170,10 +183,17 @@ def retrieve_pos(args,input_file):
                     tmpA += reverse_comp[contigA[len(contigA) -i-1 ] ]
                 contigA=tmpA
                 tmpContig=""
+
+                tmphomology=""
+                for i in range(0,len(homology_seq)):
+                    tmphomology += reverse_comp[homology_seq[len(homology_seq) -i-1 ] ]
+                homology_seq=tmphomology
+
                 for i in range(0,len(contig)):
                     tmpContig += reverse_comp[contig[len(contig)-i-1]]
                 contig = tmpContig
-            if orientationB == "-":
+
+            if orientationB == "-" and orientationA == "-":
                 tmpB=""
                 for i in range(0,len(contigB)):
                    tmpB += reverse_comp[contigB[len(contigB)-i-1]]
@@ -181,6 +201,54 @@ def retrieve_pos(args,input_file):
  
             sucess = True
             break
+
+    fontseq = xlwt.easyfont('')
+    fontA= xlwt.easyfont('color_index green')
+    fontHOM= xlwt.easyfont('color_index red')
+    fontSEQ = xlwt.easyfont('')
+    fontB= xlwt.easyfont('color_index blue')
+    seq_norm=""
+    tupleB=[]
+    tupleA=[]
+    tupleCtg=[]
+    tupleH=[]
+
+    for i in range(0,len(contigA)):
+        pos = range_primary[i]
+        if orientationA == "-":
+            pos=range_primary[len(range_primary) -1 -i]
+
+        if pos in homologous_pos:
+            tupleA.append( (contigA[i],fontHOM) )
+        else:
+            tupleA.append( (contigA[i],fontA) )
+
+    for i in range(0,len(contigB)):
+        pos = range_secondary[i]
+        if orientationA == "-":
+            pos=range_secondary[len(range_secondary) -1 -i]
+
+        if pos in homologous_pos:
+            tupleB.append( (contigB[i],fontHOM) )
+        else:
+            tupleB.append( (contigB[i],fontB) )
+
+    for i in range(0,len(contig)):
+        pos= i +1
+        if orientationA == "-":
+            pos=len(contig)-1-i
+        if pos in homologous_pos:
+            tupleCtg.append( (contig[i],fontHOM) )
+        elif pos in range_primary:
+            tupleCtg.append( (contig[i],fontA) )
+        elif pos in range_secondary:
+            tupleCtg.append( (contig[i],fontB) )
+        else:
+            tupleCtg.append( (contig[i],fontSEQ) )
+
+    for i in range(0,len(homology_seq)):
+        tupleH.append( (homology_seq[i],fontHOM) )
+
 
     if sucess:
         if AB:
@@ -192,6 +260,9 @@ def retrieve_pos(args,input_file):
             args.lengthB=SA_len
             args.regionA=contigA
             args.regionB=contigB
+            args.regionAsegments= tuple(tupleA)
+            args.regionBsegments= tuple(tupleB)
+            args.contigSegments= tuple(tupleCtg)
 
         else:
             args.posB=posA
@@ -202,10 +273,17 @@ def retrieve_pos(args,input_file):
             args.lengthB=length
             args.regionA=contigB
             args.regionB=contigA
-    return (args,sucess,contig,homology,insertions,deletions)
+            args.regionAsegments= tuple(tupleB)
+            args.regionBsegments= tuple(tupleA)
+            args.contigSegments= tuple(tupleCtg)
+    args.HomologySegments=tuple(tupleH)
 
 
-def extract_splits(args):
+    return (args,sucess,contig,homology,homology_seq,insertions,insertion_seq,deletions)
+
+
+def extract_splits(args,ws0):
+    row=1
     detected_splits={}    
 
     if args.bed:
@@ -214,6 +292,7 @@ def extract_splits(args):
         input_file=args.vcf
     else:
         print "error: missing bed or vcf"
+        quit()
     i = 0
     for line in open(input_file):
         if line[0] == "#":
@@ -233,10 +312,16 @@ def extract_splits(args):
             args.lengthB=""
             args.regionA=""
             args.regionB=""
+            insertion_seq = ""
+            homology_seq = ""
+            args.regionAsegments= ()
+            args.regionBsegments= ()
+            args.contigSegments= ()
+            args.HomologySegments = ()
             i+=1
         elif args.vcf:
             print "to be implemented, please use bed for now"
-            break
+            quit()
 
         found=FindTranslocations.main(args)
 
@@ -259,12 +344,12 @@ def extract_splits(args):
             for k in trials:
                 os.system("ABYSS -c 1 -e 0 -k {} -o {} {} > /dev/null 2>&1".format(k,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(args.working_dir,var_id,"softclip.fa") ))
                 os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(args.working_dir,var_id,"aligned_contig.sam")))
-                args,sucess,contig,bp_homology,insertions,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_contig.sam"))
+                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_contig.sam"))
                 if sucess:
                     break
 
             if not sucess:
-                args,sucess,contig,bp_homology,insertions,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
+                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
         else:
             wd=os.path.join(args.working_dir,var_id)
             os.system("samtools view -bh {} {}:{}-{} > {}/regionA.bam".format(args.bam,args.chrA,args.posA-args.padding,args.posA+args.padding,wd))
@@ -275,14 +360,31 @@ def extract_splits(args):
             for k in trials:
                 os.system("ABYSS -c {} -e {} -k {} -o {} {} > /dev/null 2>&1".format(1,10,k,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"region.fq") ))
                 os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"aligned_contig.sam")))
-                args,sucess,contig,bp_homology,insertions,deletions = retrieve_pos(args,os.path.join(wd,"aligned_contig.sam"))
+                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(wd,"aligned_contig.sam"))
                 if sucess:
                     break
             if not sucess:
                 contig=""
 
-        print"{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(args.sample,var_id,splits,args.chrA,args.posA,args.orientationA,args.chrB,args.posB,args.orientationB,bp_homology,insertions,deletions,args.lengthA,args.lengthB,len(contig),args.regionA,args.regionB,contig).strip()
+    row_content=[args.sample,var_id,splits,args.chrA,args.posA,args.orientationA,args.chrB,args.posB,args.orientationB,bp_homology,args.HomologySegments,insertions,insertion_seq,deletions,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
+    j=0
 
-header=["sampleID","variant_id","split_reads","ChrA","PosA","OrientationA","ChrB","PosB","OrientationB","breakpoint_homology(bp)","insertions","deletions","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
-print "\t".join(header)      
-detected_splits=extract_splits(args)
+
+    for item in row_content:
+
+        if j in [10,17,18,19]:
+            ws0.write_rich_text(row, j, item)
+        else:
+            ws0.write(row, j, item)
+        j+=1
+    row += 1
+wb =  xlwt.Workbook()
+ws0 = wb.add_sheet("SplitVision",cell_overwrite_ok=True)
+header=["sampleID","variant_id","split_reads","ChrA","PosA","OrientationA","ChrB","PosB","OrientationB","breakpoint_homology(bp)","breakpoint_homology(sequence)","insertions","insertions(sequence)","deletions","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
+j=0
+for item in header:
+    ws0.write(0, j, item)
+    j+=1
+
+detected_splits=extract_splits(args,ws0)
+wb.save(os.path.join(args.working_dir,args.sample+".xls"))
