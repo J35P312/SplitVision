@@ -10,9 +10,25 @@ parser.add_argument('--bam', type=str,required=True ,help="the input bam file")
 parser.add_argument('--fa', type=str,required=True ,help="the reference fasta file")
 parser.add_argument('--working_dir', type=str,default="out" ,help="working directory")
 parser.add_argument('--sample', type=str,default="patient" ,help="sample id")
-parser.add_argument('--coverage', type=int,default=20 ,help="library coverage, does not need to be exact +-15 or so will do")
+parser.add_argument('--repeatmask', type=str,help="ucsc repeatmask(or other bed following the same format)")
 parser.add_argument('--padding', type=int,default=1000 ,help="search for reads mapped within this distance fromt the breakpoint position")
 args = parser.parse_args()
+
+def find_repeat(chr,pos,repeatMask):
+    repeat=""
+    chromosome_id=chr
+    if not chromosome_id in repeatMask:
+        chromosome_id = "chr" + chr
+    if not chromosome_id in repeatMask:
+        return(repeat)
+    
+    for masked in repeatMask[chromosome_id]:
+
+        if masked["start"]  <  pos and pos < masked["end"]:
+            repeat=masked["id"]
+            return(repeat)
+
+    return(repeat)
 
 def read_cigar(cigar,contig_len):
     deletions=0
@@ -287,6 +303,15 @@ def retrieve_pos(args,input_file):
 
 
 def extract_splits(args,ws0):
+    repeatMask={}
+    if args.repeatmask:
+        for line in open(args.repeatmask):
+            if line[0] == "#":
+                continue
+            content=line.split("\t")
+            if not content[0] in repeatMask:
+                repeatMask[content[0]] =[]
+            repeatMask[content[0]].append({"id":content[3],"start":int(content[1]),"end":int(content[2])})
     row=1
     detected_splits={}    
 
@@ -323,6 +348,8 @@ def extract_splits(args,ws0):
             args.regionBsegments= ()
             args.contigSegments= ()
             args.HomologySegments = ()
+            args.repeatA= ""
+            args.repeatB= ""
             i+=1
         elif args.vcf:
             print "to be implemented, please use bed for now"
@@ -371,25 +398,27 @@ def extract_splits(args,ws0):
             if not sucess:
                 contig=""
 
-    row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.chrB,args.posB,args.orientationB,bp_homology,args.HomologySegments,insertions,insertion_seq,deletions,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
-    j=0
+        if sucess and args.repeatmask:
+            args.repeatA= find_repeat(args.chrA,args.posA,repeatMask)
+            args.repeatB= find_repeat(args.chrB,args.posB,repeatMask)
 
+        row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,args.chrB,args.posB,args.orientationB,args.repeatB,bp_homology,args.HomologySegments,insertions,insertion_seq,deletions,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
+        j=0
+        for item in row_content:
 
-    for item in row_content:
-
-        if j in [11,18,19,20]:
-            ws0.write_rich_text(row, j, item)
-        else:
-            ws0.write(row, j, item)
-        j+=1
-    row += 1
+            if j in [13,20,21,22]:
+                ws0.write_rich_text(row, j, item)
+            else:
+                ws0.write(row, j, item)
+            j+=1
+        row += 1
 wb =  xlwt.Workbook()
 ws0 = wb.add_sheet("SplitVision",cell_overwrite_ok=True)
-header=["sampleID","variant_id","variant_type","split_reads","ChrA","PosA","OrientationA","ChrB","PosB","OrientationB","breakpoint_homology(bp)","breakpoint_homology(sequence)","insertions","insertions(sequence)","deletions","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
+
+header=["sampleID","variant_id","variant_type","split_reads","ChrA","PosA","OrientationA","repeatA","ChrB","PosB","OrientationB","repeatB","breakpoint_microhomology(bp)","breakpoint_microhomology(sequence)","insertions","insertions(sequence)","deletions","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
 j=0
 for item in header:
     ws0.write(0, j, item)
-    j+=1
-
+    j += 1
 detected_splits=extract_splits(args,ws0)
 wb.save(os.path.join(args.working_dir,args.sample+".xls"))
