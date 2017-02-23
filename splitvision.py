@@ -133,7 +133,8 @@ def retrieve_pos(args,input_file):
         if not found:
             continue
         flag="{0:012b}".format(int(content[1]))
-        if not int(flag[-9]):
+        #the read is only accepted if it is a primary alignemnt, not a secondary alignment, and if it is only split in two parts
+        if not int(flag[-9]) and not int(flag[0]) and len(SA_fields) == 1:
             orientationA="+"
             orientationB=SA_orientation
             if int(flag[-5]) :
@@ -186,12 +187,28 @@ def retrieve_pos(args,input_file):
 
 
             insertion_seq=""
+            insertion_range=sorted( list(set(range(1,len(contig)+1)).difference( set(range_secondary).union( set(range_primary) ) )))
+            if insertion_range:
+                insertions =1
+            for i in range(0,len(insertion_range)):
+                if i == len(insertion_range) -1:
+                    insertion_seq +=   contig[ insertion_range[i]-1 ]
+                else:
+                    if insertion_range[i] +1 == insertion_range[i+1]:
+                        insertion_seq +=   contig[ insertion_range[i]-1 ]
+                    else:
+                        insertions += 1
+                        insertion_seq +=   contig[ insertion_range[i]-1 ]  + ","                    
+            
+
+
             contigA=""
             for i in range(0,len(range_primary)):
                 contigA += contig[range_primary[i]-1]
             
             contigB=""
             reverse_comp={"A":"T","a":"t","T":"A","t":"a","G":"C","g":"c","C":"G","c":"g"}
+
             for i in range(0,len(range_secondary)):
                 contigB += contig[range_secondary[i]-1]
 
@@ -242,7 +259,7 @@ def retrieve_pos(args,input_file):
 
             for i in range(0,len(contigB)):
                 pos = range_secondary[i]
-                if orientationA == "-":
+                if orientationB == "-" and orientationA == "-":
                     pos=range_secondary[len(range_secondary) -1 -i]
 
                 if pos in homologous_pos:
@@ -253,7 +270,7 @@ def retrieve_pos(args,input_file):
             for i in range(0,len(contig)):
                 pos= i +1
                 if orientationA == "-":
-                    pos=len(contig)-1-i
+                    pos=len(contig)-i
                 if pos in homologous_pos:
                     tupleCtg.append( (contig[i],fontHOM) )
                 elif pos in range_primary:
@@ -303,18 +320,6 @@ def retrieve_pos(args,input_file):
 
 
 def extract_splits(args,ws0):
-    repeatMask={}
-    if args.repeatmask:
-        for line in open(args.repeatmask):
-            if line[0] == "#":
-                continue
-            content=line.split("\t")
-            if not content[0] in repeatMask:
-                repeatMask[content[0]] =[]
-            repeatMask[content[0]].append({"id":content[3],"start":int(content[1]),"end":int(content[2])})
-    row=1
-    detected_splits={}    
-
     if args.bed:
         input_file=args.bed
     elif args.vcf:
@@ -322,6 +327,45 @@ def extract_splits(args,ws0):
     else:
         print "error: missing bed or vcf"
         quit()
+
+    repeatMask={}
+    if args.repeatmask:
+        chromosomes={}
+        for line in open(input_file):
+            content=line.strip().split()
+            chrA=content[0]
+            chrB=content[2]
+            if not chrA in chromosomes:
+                chromosomes[chrA] = []
+            if not chrB in chromosomes:
+                chromosomes[chrB] = []          
+            chromosomes[chrA].append(int(content[1]))
+            chromosomes[chrB].append(int(content[3]))
+
+        for chromosome in chromosomes:
+            chromosomes[chromosome]=[min(chromosomes[chromosome])-args.padding,max(chromosomes[chromosome])+ args.padding]
+            print chromosomes[chromosome]
+        for line in open(args.repeatmask):
+            if line[0] == "#":
+                continue
+            content=line.split("\t")
+            chromosome_id=content[0]
+            if not chromosome_id in chromosomes:
+                chromosome_id = "chr" + chromosome_id
+                if not chromosome_id in chromosomes:
+                    continue
+            elif  chromosomes[chromosome_id][0]  > int(content[2]):
+                continue
+            elif int(content[1]) > chromosomes[chromosome_id][1]:
+                continue
+
+            if not content[0] in repeatMask:
+                repeatMask[content[0]] =[]
+            repeatMask[content[0]].append({"id":content[3],"start":int(content[1]),"end":int(content[2])})
+    row=1
+    detected_splits={}    
+
+
     i = 0
     for line in open(input_file):
         if line[0] == "#":

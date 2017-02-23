@@ -14,5 +14,6 @@ SplitVision requires:
     ABYSS
     BWA
     samtools
+    xlwt(python module)
 
 the reference fasta needs to be indexed using bwa.
