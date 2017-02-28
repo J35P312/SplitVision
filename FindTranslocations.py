@@ -79,7 +79,7 @@ def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir,it):
     os.system("samtools view -H {} > {}_header.sam".format(bam,prefix))
 
     target = open(working_dir +"/" + "splits.sam", 'w')
-
+    splits=set(splits)
     for line in splits:
         target.write(line)
     target.close()
