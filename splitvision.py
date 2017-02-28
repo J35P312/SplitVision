@@ -3,6 +3,8 @@ import FindTranslocations
 import itertools
 import os
 import xlwt
+import readVCF
+
 parser = argparse.ArgumentParser("""SplitVision - SV breakpoint analysis software""")
 parser.add_argument('--vcf'        , type=str, help="input vcf file containing breakpoints of interest(use only bed or vcf at a time)")
 parser.add_argument('--bed', type=str, help="input bed file(tab separted) containing the sv breakpoints(format: chrA,posA,chrB,posB)")
@@ -332,15 +334,24 @@ def extract_splits(args,ws0):
     if args.repeatmask:
         chromosomes={}
         for line in open(input_file):
-            content=line.strip().split()
-            chrA=content[0]
-            chrB=content[2]
+            if line[0] == "#":
+                continue
+            if args.bed:
+                content=line.strip().split()
+                chrA= content[0]
+                posA= int(content[1])
+                chrB= content[2]
+                posB= int(content[3])
+
+            elif args.vcf:
+                chrA,posA,chrB,posB,event_type,INFO,FORMAT = readVCF.readVCFLine(line)
+
             if not chrA in chromosomes:
                 chromosomes[chrA] = []
             if not chrB in chromosomes:
                 chromosomes[chrB] = []          
-            chromosomes[chrA].append(int(content[1]))
-            chromosomes[chrB].append(int(content[3]))
+            chromosomes[chrA].append(int(posA))
+            chromosomes[chrB].append(int(posB))
 
         for chromosome in chromosomes:
             chromosomes[chromosome]=[min(chromosomes[chromosome])-args.padding,max(chromosomes[chromosome])+ args.padding]
@@ -396,8 +407,31 @@ def extract_splits(args,ws0):
             args.repeatB= ""
             i+=1
         elif args.vcf:
-            print "to be implemented, please use bed for now"
-            quit()
+            chrA,posA,chrB,posB,event_type,INFO,FORMAT = readVCF.readVCFLine(line)
+            args.chrA= chrA
+            args.posA= int(posA)
+            args.chrB= chrB
+            args.posB= int(posB)
+            args.type= event_type
+
+            args.orientationA=""
+            args.orientationB=""
+            args.id=str(i)
+            var_id=str(i)
+            args.lengthA=""
+            args.lengthB=""
+            args.regionA=""
+            args.regionB=""
+            insertion_seq = ""
+            homology_seq = ""
+            args.regionAsegments= ()
+            args.regionBsegments= ()
+            args.contigSegments= ()
+            args.HomologySegments = ()
+            args.repeatA= ""
+            args.repeatB= ""
+            i+=1
+
 
         found=FindTranslocations.main(args)
 
