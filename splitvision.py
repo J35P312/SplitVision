@@ -10,8 +10,8 @@ parser.add_argument('--vcf'        , type=str, help="input vcf file containing b
 parser.add_argument('--bed', type=str, help="input bed file(tab separted) containing the sv breakpoints(format: chrA,posA,chrB,posB)")
 parser.add_argument('--bam', type=str,required=True ,help="the input bam file")
 parser.add_argument('--fa', type=str,required=True ,help="the reference fasta file")
-parser.add_argument('--working_dir', type=str,default="out" ,help="working directory")
-parser.add_argument('--sample', type=str,default="patient" ,help="sample id")
+parser.add_argument('--working_dir', type=str ,help="working directory")
+parser.add_argument('--sample', type=str ,help="sample id")
 parser.add_argument('--repeatmask', type=str,help="ucsc repeatmask(or other bed following the same format)")
 parser.add_argument('--padding', type=int,default=1000 ,help="search for reads mapped within this distance fromt the breakpoint position")
 args = parser.parse_args()
@@ -67,7 +67,6 @@ def read_cigar(cigar,contig_len):
             current_pos += int( SC[i*2] )
        	elif SC[i*2+1] == "D":
        	    deletions +=1
-            current_pos += int( SC[i*2] )
         else:
             current_pos += int( SC[i*2] )
 
@@ -222,8 +221,16 @@ def retrieve_pos(args,input_file):
                 tmpContig=""
 
                 tmphomology=""
-                for i in range(0,len(homology_seq)):
-                    tmphomology += reverse_comp[homology_seq[len(homology_seq) -i-1 ] ]
+                if not "," in homology_seq:
+                    for i in range(0,len(homology_seq)):
+                        tmphomology += reverse_comp[homology_seq[len(homology_seq) -i-1 ] ]
+                else:
+                    homologous_sequences=homology_seq.split(",")
+                    for seq in homologous_sequences:
+                        for i in range(0,len(seq)):
+                            if not i == 0:
+                                tmphomology += ","
+                            tmphomology += reverse_comp[seq[len(seq) -i-1 ] ]
                 homology_seq=tmphomology
 
                 for i in range(0,len(contig)):
@@ -329,6 +336,11 @@ def extract_splits(args,ws0):
     else:
         print "error: missing bed or vcf"
         quit()
+
+    if not args.sample:
+        args.sample=args.bam.split("/")[-1].split(".")[0]
+    if not args.working_dir:
+        args.working_dir=args.bam.split("/")[-1].split(".")[0]
 
     repeatMask={}
     if args.repeatmask:
@@ -452,14 +464,25 @@ def extract_splits(args,ws0):
             target.close()
             trials=[20,90]
             for k in trials:
+                print i
+                print var_id
                 os.system("ABYSS -c 1 -e 0 -k {} -o {} {} > /dev/null 2>&1".format(k,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(args.working_dir,var_id,"softclip.fa") ))
                 os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(args.working_dir,var_id,"aligned_contig.sam")))
-                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_contig.sam"))
+
+                try:
+                    args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_contig.sam"))
+                except:
+                    pass
+
                 if sucess:
                     break
 
             if not sucess:
-                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
+
+                try:
+                    args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
+                except:
+                    homology_seq="WARNING:unable to determine the breakpoint sequence"
         else:
             wd=os.path.join(args.working_dir,var_id)
             os.system("samtools view -bh {} {}:{}-{} > {}/regionA.bam".format(args.bam,args.chrA,args.posA-args.padding,args.posA+args.padding,wd))
@@ -470,7 +493,11 @@ def extract_splits(args,ws0):
             for k in trials:
                 os.system("ABYSS -c {} -e {} -k {} -o {} {} > /dev/null 2>&1".format(1,10,k,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"region.fq") ))
                 os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"aligned_contig.sam")))
-                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(wd,"aligned_contig.sam"))
+                try:
+                    args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(wd,"aligned_contig.sam"))
+                except:
+                    homology_seq="WARNING:unable to determine the breakpoint sequence"
+
                 if sucess:
                     break
             if not sucess:
