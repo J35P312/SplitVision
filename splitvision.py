@@ -334,15 +334,24 @@ def extract_splits(args,ws0):
     if args.repeatmask:
         chromosomes={}
         for line in open(input_file):
-            content=line.strip().split()
-            chrA=content[0]
-            chrB=content[2]
+            if line[0] == "#":
+                continue
+            if args.bed:
+                content=line.strip().split()
+                chrA= content[0]
+                posA= int(content[1])
+                chrB= content[2]
+                posB= int(content[3])
+
+            elif args.vcf:
+                chrA,posA,chrB,posB,event_type,INFO,FORMAT = readVCF.readVCFLine(line)
+
             if not chrA in chromosomes:
                 chromosomes[chrA] = []
             if not chrB in chromosomes:
                 chromosomes[chrB] = []          
-            chromosomes[chrA].append(int(content[1]))
-            chromosomes[chrB].append(int(content[3]))
+            chromosomes[chrA].append(int(posA))
+            chromosomes[chrB].append(int(posB))
 
         for chromosome in chromosomes:
             chromosomes[chromosome]=[min(chromosomes[chromosome])-args.padding,max(chromosomes[chromosome])+ args.padding]
