@@ -88,8 +88,22 @@ def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir,it):
     elif it == 2:
        os.system("cat {}_header.sam {}/splits.sam | samtools view -Shb - > {}/splits_2.bam".format(prefix,working_dir,working_dir  ))
        os.system("samtools merge -f {}/splits.bam {}/splits_1.bam {}/splits_2.bam".format(working_dir, working_dir, working_dir))
+       os.system("samtools view -h {}/splits.bam > {}/splits.sam".format(working_dir,working_dir))
+
+       unique_alignments=[]
+       for line in open("{}/splits.sam".format(working_dir)):
+          unique_alignments.append(line.strip() )
+
+       unique_alignments=set(unique_alignments)
+       target = open(working_dir +"/" + "splits.sam", 'w')
+       for line in unique_alignments:
+          target.write(line + "\n")
+       target.close()
+
        os.system("samtools bam2fq {}/splits.bam > {}/splits.fq".format(working_dir,working_dir))
        os.system("samtools view {}/splits.bam > {}/splits.sam".format(working_dir,working_dir))
+
+
     #os.system("samtools bam2fq {}/splits.bam > {}/splits.fastq".format(working_dir,working_dir) )
     return found
 
