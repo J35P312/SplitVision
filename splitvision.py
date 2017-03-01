@@ -458,7 +458,7 @@ def extract_splits(args,ws0):
             for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
                 content= line.strip().split("\t")
                 flag="{0:012b}".format(int(content[1]))
-                if not int(flag[-9]) and not int(flag[0]):
+                if not int(flag[-9]) and not int(flag[0]) and not int(flag[1]) and not int(flag[2]):
                    target.write( ">" + content[0] + "\n")
                    target.write(content[9] + "\n")
                    splits += 1
