@@ -451,7 +451,7 @@ def extract_splits(args,ws0):
         bp_homology=""
         insertions=""
         deletions=""
-
+        sucess = False
         if found:
             target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
             for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
@@ -462,13 +462,13 @@ def extract_splits(args,ws0):
                    target.write(content[9] + "\n")
                    splits += 1
             target.close()
-            trials=[20,90]
+            trials=[20,60,90]
             for k in trials:
-                print i
-                print var_id
-                os.system("ABYSS -c 1 -e 0 -k {} -o {} {} > /dev/null 2>&1".format(k,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(args.working_dir,var_id,"softclip.fa") ))
-                os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(args.working_dir,var_id,"aligned_contig.sam")))
+                os.system("ABYSS -c {} -e {} -k {} -o {}_{}.fa {} > /dev/null 2>&1".format(1,0,k,os.path.join(args.working_dir,var_id,"abyss"),k,os.path.join(wd,"region.fq") ))
+            os.system("cat {}_20.fa {}_60.fa {}_90.fa > {}".format(os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss")   ,os.path.join(args.working_dir,var_id,"abyss.fa")))
 
+            if not os.stat( os.path.join(args.working_dir,var_id,"abyss.fa") ).st_size == 0:
+                os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"aligned_contig.sam")))
                 try:
                     args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_contig.sam"))
                 except:
@@ -489,17 +489,17 @@ def extract_splits(args,ws0):
             os.system("samtools view -bh {} {}:{}-{} > {}/regionB.bam".format(args.bam,args.chrB,args.posB-args.padding,args.posB+args.padding,wd))
             os.system("samtools merge -f {}/region.bam {}/regionA.bam {}/regionB.bam ".format(wd,wd,wd))
             os.system("samtools bam2fq {}/region.bam > {}/region.fq".format(wd,wd))
-            trials=[20,40,60,90]
+            trials=[20,60,90]
             for k in trials:
-                os.system("ABYSS -c {} -e {} -k {} -o {} {} > /dev/null 2>&1".format(1,10,k,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"region.fq") ))
+                os.system("ABYSS -c {} -e {} -k {} -o {}_{}.fa {} > /dev/null 2>&1".format(1,10,k,os.path.join(args.working_dir,var_id,"abyss"),k,os.path.join(wd,"region.fq") ))
+            os.system("cat {}_20.fa {}_60.fa {}_90.fa > {}".format(os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss")   ,os.path.join(args.working_dir,var_id,"abyss.fa")))
+
+            if not os.stat( os.path.join(args.working_dir,var_id,"abyss.fa") ).st_size == 0:
                 os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"aligned_contig.sam")))
                 try:
                     args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(wd,"aligned_contig.sam"))
                 except:
                     homology_seq="WARNING:unable to determine the breakpoint sequence"
-
-                if sucess:
-                    break
             if not sucess:
                 contig=""
 

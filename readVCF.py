@@ -6,7 +6,7 @@ def readVCFLine(line):
 
     variation   = line.rstrip().split("\t")
     event_type=""
-    chrA=variation[0].replace("chr","").replace("Chr","").replace("CHR","");
+    chrA=variation[0];
     posA=int(variation[1]);
     posB=0;
 
@@ -84,7 +84,7 @@ def readVCFLine(line):
         for string in B:
             if string.count(":"):
                 lst=string.split(":");
-                chrB=lst[0].replace("chr","").replace("Chr","").replace("CHR","")
+                chrB=lst[0]
                 posB=int(lst[1]);
                 if chrA > chrB:
                     chrT = chrA
