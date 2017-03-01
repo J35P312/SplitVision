@@ -428,7 +428,7 @@ def extract_splits(args,ws0):
 
             args.orientationA=""
             args.orientationB=""
-            args.id=str(i)
+            args.id=line.strip().split("\t")[2]
             var_id=line.strip().split("\t")[2]
             args.lengthA=""
             args.lengthB=""
