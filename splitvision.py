@@ -465,7 +465,7 @@ def extract_splits(args,ws0):
             target.close()
             trials=[20,60,90]
             for k in trials:
-                os.system("ABYSS -c {} -e {} -k {} -o {}_{}.fa {} > /dev/null 2>&1".format(1,0,k,os.path.join(args.working_dir,var_id,"abyss"),k,os.path.join(wd,"region.fq") ))
+                os.system("ABYSS -c {} -e {} -k {} -o {}_{}.fa {} > /dev/null 2>&1".format(1,0,k,os.path.join(args.working_dir,var_id,"abyss"),k,os.path.join(wd,"softclip.fa") ))
             os.system("cat {}_20.fa {}_60.fa {}_90.fa > {}".format(os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss")   ,os.path.join(args.working_dir,var_id,"abyss.fa")))
 
             if not os.stat( os.path.join(args.working_dir,var_id,"abyss.fa") ).st_size == 0:
