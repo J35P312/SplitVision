@@ -474,10 +474,6 @@ def extract_splits(args,ws0):
                     args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_contig.sam"))
                 except:
                     pass
-
-                if sucess:
-                    break
-
             if not sucess:
 
                 try:
