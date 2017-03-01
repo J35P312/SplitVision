@@ -100,8 +100,8 @@ def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir,it):
           unique_aln_sam .write(line + "\n")
        unique_aln_sam.close()
 
-       os.system("cat {}_header.sam {}/splits.sam | samtools view -Shb - > {}/splits.bam".format(prefix,working_dir,working_dir  ))
-       os.system("samtools bam2fq {}/splits.bam > {}/splits.fq".format(working_dir,working_dir))
+       #os.system("cat {}_header.sam {}/splits.sam | samtools view -Shb - > {}/splits.bam".format(prefix,working_dir,working_dir  ))
+       #os.system("samtools bam2fq {}/splits.bam > {}/splits.fq".format(working_dir,working_dir))
 
     #os.system("samtools bam2fq {}/splits.bam > {}/splits.fastq".format(working_dir,working_dir) )
     return found
