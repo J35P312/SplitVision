@@ -25,6 +25,24 @@ def find_repeat(chr,pos,c):
         if i > 1000:
             return("","")
 
+def find_snps(chr,pos,c,dist):
+    delta=10000
+    i =0
+    closest_snp=[]
+    snp_distance=[]
+    while True:
+        i +=1
+        A='SELECT pos,ref,alt FROM SVDB WHERE chr == \'{}\' AND end > {} AND start < {} '.format(chr,int(pos)-delta,int(pos)+delta)
+        d={}
+        for hit in c.execute(A):
+            snp_distancec.append( abs(pos- int( hit[0] ))  )
+            if hit[0] <= dist:
+                closest_snp.append( "{}:{},{}->{}".format(chr,hit[0],str(hit[1]),str(hit[2])) )
+        if snp_distance:
+            return( str(min(snp_distance)),"|".join(closest_snp) )
+        delta = delta*10
+        if i > 1000:
+            return("","")
 
 def db(args):
 
@@ -356,6 +374,32 @@ def extract_splits(args,ws0):
         conn = sqlite3.connect(args.repeatmask)
         c = conn.cursor()
 
+    if args.snps:
+        conn_snp=sqlite3.connect(":memory:")
+        c_snp = conn_snp.cursor()
+
+        A="CREATE TABLE SVDB (chr TEXT, pos INT,ref TEXT, alt TEXT)"
+        c_snp.execute(A)
+
+        input_vcf=[]
+        for line in open(args.snps):
+            if line[0] == "#":
+                continue
+            content=line.strip().split()
+            input_vcf.append([ content[0].replace("chr",""), content[1] , content[3] ,content[4] ])                
+            if len(input_tab) > 1000000:
+                c_snp.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_vcf)          
+                input_vcf=[]
+        if input_vcf:
+            c_snp.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_vcf)
+                    
+
+        A="CREATE INDEX SNP ON SVDB (chr, pos)"
+        c_snp.execute(A)
+        conn_snp.commit()
+
+        
+
     row=1
     detected_splits={}    
 
@@ -491,15 +535,23 @@ def extract_splits(args,ws0):
 
         distanceA=""
         distanceB=""
-        if sucess and args.repeatmask:
+        if args.repeatmask:
             distanceA,args.repeatA= find_repeat(args.chrA,args.posA,c)
             distanceB,args.repeatB= find_repeat(args.chrB,args.posB,c)
 
-        row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,distanceA,args.chrB,args.posB,args.orientationB,args.repeatB,distanceB,bp_homology,args.HomologySegments,insertions,insertion_seq,deletions,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
+        snpDistanceA=""
+        snpDistanceB=""
+        snpsA=""
+        snpsB=""
+        if args.snps:
+            snpDistanceA,snpsA= find_snps(args.chrA,args.posA,c_snp,args.snp_distance)
+            snpDistanceB,snpsB= find_snps(args.chrB,args.posB,c_snp,args.snp_distance)
+
+        row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,distanceA,args.chrB,args.posB,args.orientationB,args.repeatB,distanceB,bp_homology,args.HomologySegments,insertions,insertion_seq,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
         j=0
         for item in row_content:
 
-            if j in [15,22,23,24]:
+            if j in [19,25,26,27]:
                 ws0.write_rich_text(row, j, item)
             else:
                 ws0.write(row, j, item)
@@ -524,6 +576,8 @@ if args.analyse:
     parser.add_argument('--skip_assembly',required=False, action="store_true",help="skip the assembly analysis")
     parser.add_argument('--working_dir', type=str ,help="working directory")
     parser.add_argument('--sample', type=str ,help="sample id")
+    parser.add_argument('--snps', type=str ,help="a vcf file containing snps, the software will compute the distance to the closest snp, and report snps within the snp_distance")
+    parser.add_argument('--snp_distance', type=int,default=100 ,help="report snps within this distance ")
     parser.add_argument('--repeatmask', type=str,help="database file generated from the uscs repeat mask")
     parser.add_argument('--padding', type=int,default=1000 ,help="search for reads mapped within this distance fromt the breakpoint position")
     args = parser.parse_args()
@@ -531,7 +585,7 @@ if args.analyse:
     wb =  xlwt.Workbook()
     ws0 = wb.add_sheet("SplitVision",cell_overwrite_ok=True)
     
-    header=["sampleID","variant_id","variant_type","split_reads","ChrA","PosA","OrientationA","repeatA","repeat_distance","ChrB","PosB","OrientationB","repeatB","repeat_distance","breakpoint_microhomology(bp)","breakpoint_microhomology(sequence)","insertions","insertions(sequence)","deletions","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
+    header=["sampleID","variant_id","variant_type","split_reads","ChrA","PosA","OrientationA","repeatA","repeat_distanceA","snps/indelsA","snp_distance_A","ChrB","PosB","OrientationB","repeatB","repeat_distanceB","snps/indelsB","snp_distance_B","breakpoint_microhomology(bp)","breakpoint_microhomology(sequence)","insertions(bp)","insertions(sequence)","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
     j=0
     for item in header:
         ws0.write(0, j, item)
