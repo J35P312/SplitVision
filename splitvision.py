@@ -36,7 +36,7 @@ def find_snps(chr,pos,c,dist):
         A='SELECT pos,ref,alt FROM SVDB WHERE chr == \'{}\' AND pos > {} AND pos < {} '.format(chr,int(pos)-delta,int(pos)+delta)
         d={}
         for hit in c.execute(A):
-            snp_distancec.append( abs(pos- int( hit[0] ))  )
+            snp_distance.append( abs(pos- int( hit[0] ))  )
             if hit[0] <= dist:
                 closest_snp.append( "{}:{},{}->{}".format(chr,hit[0],str(hit[1]),str(hit[2])) )
         if snp_distance:
