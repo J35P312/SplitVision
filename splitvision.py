@@ -5,7 +5,7 @@ import os
 import xlwt
 import readVCF
 import sqlite3
-import gzip:
+import gzip
 
 
 def find_repeat(chr,pos,c):
