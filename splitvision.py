@@ -444,7 +444,8 @@ def extract_splits(args,ws0):
         insertions=""
         deletions=""
         sucess = False
-        if args.no_assembly:
+
+        if args.skip_assembly:
             for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
                 content= line.strip().split("\t")
                 flag="{0:012b}".format(int(content[1]))
@@ -458,6 +459,7 @@ def extract_splits(args,ws0):
                 args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
             except:
                 homology_seq="WARNING:unable to determine the breakpoint sequence"   
+
         elif found:
             wd=os.path.join(args.working_dir,var_id)
             target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
