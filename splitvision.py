@@ -5,6 +5,7 @@ import os
 import xlwt
 import readVCF
 import sqlite3
+import gzip:
 
 
 def find_repeat(chr,pos,c):
@@ -382,7 +383,14 @@ def extract_splits(args,ws0):
         c_snp.execute(A)
 
         input_vcf=[]
-        for line in open(args.snps):
+
+        if args.snps.endswith('.gz'):
+            opener = gzip.open
+        else:
+            opener = open
+
+
+        for line in opener(args.snps):
             if line[0] == "#":
                 continue
             content=line.strip().split()
