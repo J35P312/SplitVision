@@ -149,27 +149,16 @@ def retrieve_pos(args,input_file):
 
             posA=int(content[3])+length-1
             posB=SA_start
-            if orientationA == "+":
-                if clip_after:
-                    posA=int(content[3])+length-1
-                else:
-                    posA=int(content[3])
+            if clip_after:
+               posA=int(content[3])+length-1
             else:
-                if clip_after:
-                    posA=int(content[3])
-                else:
-                    posA=int(content[3])+length-1
+               posA=int(content[3])
 
-            if orientationB == "+":
-                if SA_clip_after:
-                    posB=SA_end
-                else:
-                    posB=SA_start
+            if SA_clip_after:
+               posB=SA_end
             else:
-                if SA_clip_after:
-                    posB=SA_start
-                else:
-                    posB=SA_end
+               posB=SA_start
+
 
             if orientationB != orientationA:
                 for i in range(0,len(range_secondary)):
@@ -456,6 +445,15 @@ def extract_splits(args,ws0):
         deletions=""
         sucess = False
         if args.no_assembly:
+            for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
+                content= line.strip().split("\t")
+                flag="{0:012b}".format(int(content[1]))
+                if not int(flag[-9]) and not int(flag[0]) and not int(flag[1]) and not int(flag[2]):
+                   target.write( ">" + content[0] + "\n")
+                   target.write(content[9] + "\n")
+                   splits += 1
+            target.close()
+
             try:
                 args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
             except:
