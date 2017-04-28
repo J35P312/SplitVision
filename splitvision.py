@@ -446,6 +446,8 @@ def extract_splits(args,ws0):
         sucess = False
 
         if args.skip_assembly:
+            wd=os.path.join(args.working_dir,var_id)
+            target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
             for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
                 content= line.strip().split("\t")
                 flag="{0:012b}".format(int(content[1]))
