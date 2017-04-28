@@ -23,36 +23,12 @@ def get_sam_data(line):
 def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir,it):
     bam_prefix=bam.split("/")[-1]
     prefix=working_dir + "/" +  bam_prefix[0:-4]
-    #print "samtools view {} {}:{}-{} | grep \"SA:\" | grep -E :{},|;{}, > test.sam".format(bam,chrA,startA,stopA,chrB,chrB)
-    os.system("samtools view {} {}:{}-{} | grep \"SA:\" | grep -E \":{},|;{},\"  > {}_test.sam".format(bam,chrA,startA,stopA,chrB,chrB,prefix))
-    #os.system("samtools view {} {}:{}-{} > test.sam".format(bam,chrA,start,stopA))
-
-    sam_gamwise=[]
-    splits=[]
-    for line in open("{}_test.sam".format(prefix)):
-        content=line.split("\t")
-
-        pos = int(content[3])
-        #print line
-        #print "{} {} {}".format(pos,startA,stopA)
-        if pos >= startA and pos <= stopA:
-            sam_gamwise.append(line)
-            continue
-
-        SC = ["".join(x) for _, x in itertools.groupby(content[5], key=str.isdigit)]
-        length=0
-        for i in range(0,len(SC)/2):
-             if SC[i*2+1] == "M":
-                 length += int( SC[i*2] )
-
-        if pos+length >= startA and pos+length <= stopA:
-            sam_gamwise.append(line)
-
-        
+    os.system("samtools view {} {}:{}-{} | grep \"SA:\" | grep -E \":{},|;{},\" > {}_test.sam".format(bam,chrA,startA,stopA,chrB,chrB,prefix))
+    print "samtools view {} {}:{}-{} | grep \"SA:\" | grep -E \":{},|;{},\" > {}_test.sam".format(bam,chrA,startA,stopA,chrB,chrB,prefix)
+    print("{},{}:{},{}".format(startA,stopA,startB,stopB))
+    splits=[]        
     found = False
-    for line in sam_gamwise:
-        if not "\tSA:Z" in line:
-           continue
+    for line in open("{}_test.sam".format(prefix)):
         SA_line=line.strip().split("SA:Z:")[-1].split("\t")[0]
         SA_fields=SA_line.strip(";").split(";")
         for SA in SA_fields:
@@ -125,7 +101,9 @@ def main(args):
         #print 1
         found =find_variants(args.bam,chrB,startB,stopB,chrA,startA,stopA,working_dir,2)
     else:
-       # print 2
+       # print 
         tmp =find_variants(args.bam,chrB,startB,stopB,chrA,startA,stopA,working_dir,2)
+        if tmp:
+            found = True
 
     return found  

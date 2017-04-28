@@ -445,7 +445,7 @@ def extract_splits(args,ws0):
         deletions=""
         sucess = False
 
-        if args.skip_assembly:
+        if args.skip_assembly and found:
             wd=os.path.join(args.working_dir,var_id)
             target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
             for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
