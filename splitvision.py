@@ -455,7 +455,7 @@ def extract_splits(args,ws0):
         insertions=""
         deletions=""
         sucess = False
-        if args.no_assembly:
+        if args.skip_assembly:
             try:
                 args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
             except:
