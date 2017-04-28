@@ -33,7 +33,7 @@ def find_snps(chr,pos,c,dist):
     snp_distance=[]
     while True:
         i +=1
-        A='SELECT pos,ref,alt FROM SVDB WHERE chr == \'{}\' AND end > {} AND start < {} '.format(chr,int(pos)-delta,int(pos)+delta)
+        A='SELECT pos,ref,alt FROM SVDB WHERE chr == \'{}\' AND pos > {} AND pos < {} '.format(chr,int(pos)-delta,int(pos)+delta)
         d={}
         for hit in c.execute(A):
             snp_distancec.append( abs(pos- int( hit[0] ))  )
