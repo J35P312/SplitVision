@@ -10,11 +10,14 @@ parser.add_argument('--vcf'        , type=str, help="input vcf file containing b
 parser.add_argument('--bed', type=str, help="input bed file(tab separted) containing the sv breakpoints(format: chrA,posA,chrB,posB)")
 parser.add_argument('--bam', type=str,required=True ,help="the input bam file")
 parser.add_argument('--fa', type=str,required=True ,help="the reference fasta file")
+parser.add_argument('--skip_assembly',required=False, action="store_true",help="skip the assembly analysis")
 parser.add_argument('--working_dir', type=str ,help="working directory")
 parser.add_argument('--sample', type=str ,help="sample id")
 parser.add_argument('--repeatmask', type=str,help="ucsc repeatmask(or other bed following the same format)")
 parser.add_argument('--padding', type=int,default=1000 ,help="search for reads mapped within this distance fromt the breakpoint position")
 args = parser.parse_args()
+
+
 
 def find_repeat(chr,pos,repeatMask):
     repeat=""
@@ -452,7 +455,12 @@ def extract_splits(args,ws0):
         insertions=""
         deletions=""
         sucess = False
-        if found:
+        if args.no_assembly:
+            try:
+                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
+            except:
+                homology_seq="WARNING:unable to determine the breakpoint sequence"   
+        elif found:
             wd=os.path.join(args.working_dir,var_id)
             target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
             for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
