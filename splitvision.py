@@ -395,7 +395,7 @@ def extract_splits(args,ws0):
                 continue
             content=line.strip().split()
             input_vcf.append([ content[0].replace("chr",""), content[1] , content[3] ,content[4] ])                
-            if len(input_tab) > 1000000:
+            if len(input_vcf) > 1000000:
                 c_snp.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_vcf)          
                 input_vcf=[]
         if input_vcf:
