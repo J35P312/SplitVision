@@ -492,8 +492,8 @@ def extract_splits(args,ws0):
         distanceA=""
         distanceB=""
         if sucess and args.repeatmask:
-            args.repeatA,distanceA= find_repeat(args.chrA,args.posA,c)
-            args.repeatB,distanceB= find_repeat(args.chrB,args.posB,c)
+            distanceA,args.repeatA= find_repeat(args.chrA,args.posA,c)
+            distanceB,args.repeatB= find_repeat(args.chrB,args.posB,c)
 
         row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,distanceA,args.chrB,args.posB,args.orientationB,args.repeatB,distanceB,bp_homology,args.HomologySegments,insertions,insertion_seq,deletions,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
         j=0
