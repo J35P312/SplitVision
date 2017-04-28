@@ -258,7 +258,7 @@ def retrieve_pos(args,input_file):
             fontseq = xlwt.easyfont('')
             fontA= xlwt.easyfont('color_index green')
             fontHOM= xlwt.easyfont('color_index red')
-            fontSEQ = xlwt.easyfont('color_index yellow')
+            fontSEQ = xlwt.easyfont('color_index orange')
             fontB= xlwt.easyfont('color_index blue')
             seq_norm=""
             tupleB=[]
