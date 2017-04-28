@@ -4,36 +4,54 @@ import itertools
 import os
 import xlwt
 import readVCF
-
-parser = argparse.ArgumentParser("""SplitVision - SV breakpoint analysis software""")
-parser.add_argument('--vcf'        , type=str, help="input vcf file containing breakpoints of interest(use only bed or vcf at a time)")
-parser.add_argument('--bed', type=str, help="input bed file(tab separted) containing the sv breakpoints(format: chrA,posA,chrB,posB)")
-parser.add_argument('--bam', type=str,required=True ,help="the input bam file")
-parser.add_argument('--fa', type=str,required=True ,help="the reference fasta file")
-parser.add_argument('--skip_assembly',required=False, action="store_true",help="skip the assembly analysis")
-parser.add_argument('--working_dir', type=str ,help="working directory")
-parser.add_argument('--sample', type=str ,help="sample id")
-parser.add_argument('--repeatmask', type=str,help="ucsc repeatmask(or other bed following the same format)")
-parser.add_argument('--padding', type=int,default=1000 ,help="search for reads mapped within this distance fromt the breakpoint position")
-args = parser.parse_args()
+import sqlite3
 
 
+def find_repeat(chr,pos,c):
+    delta=10000
+    i =0
+    while True:
+        i +=1
+        A='SELECT start,end,id FROM SVDB WHERE chr == \'{}\' AND end > {} AND start < {} '.format(chr,int(pos)-delta,int(pos)+delta)
+        d={}
+        for hit in c.execute(A):
+            d[ abs(pos- int( hit[0] )) ] = str(hit[2])
+            d[ abs(pos- int( hit[1] )) ] = str(hit[2])
+            if pos >= int( hit[0]) and pos <= int( hit[1] ):
+                d[0]=str(hit[2])
+        if d:
+            return( str(min(d)),d[min(d)] )
+        delta = delta*10
+        if i > 1000:
+            return("","")
 
-def find_repeat(chr,pos,repeatMask):
-    repeat=""
-    chromosome_id=chr
-    if not chromosome_id in repeatMask:
-        chromosome_id = "chr" + chr
-    if not chromosome_id in repeatMask:
-        return(repeat)
-    
-    for masked in repeatMask[chromosome_id]:
 
-        if masked["start"]  <  pos and pos < masked["end"]:
-            repeat=masked["id"]
-            return(repeat)
+def db(args):
 
-    return(repeat)
+    conn = sqlite3.connect(args.prefix+".db")
+    c = conn.cursor()
+    A="CREATE TABLE SVDB (chr TEXT, start INT,end INT, id TEXT)"
+    c.execute(A)
+
+    input_tab=[]
+    for line in open(args.tab):
+        if line[0] == "#":
+            continue
+        content=line.strip().split()
+        input_tab.append([ content[0].replace("chr",""), content[1] , content[2] ,content[3] ])
+                
+        if len(input_tab) > 1000000:
+            c.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_tab)          
+            input_tab=[]
+    if input_tab:
+        c.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_tab)
+                    
+
+    A="CREATE INDEX SNP ON SVDB (chr, start, end)"
+    c.execute(A)
+    conn.commit()
+    conn.close()
+    return()
 
 def read_cigar(cigar,contig_len):
     deletions=0
@@ -334,49 +352,10 @@ def extract_splits(args,ws0):
     if not args.working_dir:
         args.working_dir=args.bam.split("/")[-1].split(".")[0]
 
-    repeatMask={}
     if args.repeatmask:
-        chromosomes={}
-        for line in open(input_file):
-            if line[0] == "#":
-                continue
-            if args.bed:
-                content=line.strip().split()
-                chrA= content[0]
-                posA= int(content[1])
-                chrB= content[2]
-                posB= int(content[3])
+        conn = sqlite3.connect(args.repeatmask)
+        c = conn.cursor()
 
-            elif args.vcf:
-                chrA,posA,chrB,posB,event_type,INFO,FORMAT = readVCF.readVCFLine(line)
-
-            if not chrA in chromosomes:
-                chromosomes[chrA] = []
-            if not chrB in chromosomes:
-                chromosomes[chrB] = []          
-            chromosomes[chrA].append(int(posA))
-            chromosomes[chrB].append(int(posB))
-
-        for chromosome in chromosomes:
-            chromosomes[chromosome]=[min(chromosomes[chromosome])-args.padding,max(chromosomes[chromosome])+ args.padding]
-            print chromosomes[chromosome]
-        for line in open(args.repeatmask):
-            if line[0] == "#":
-                continue
-            content=line.split("\t")
-            chromosome_id=content[0]
-            if not chromosome_id in chromosomes:
-                chromosome_id = "chr" + chromosome_id
-                if not chromosome_id in chromosomes:
-                    continue
-            elif  chromosomes[chromosome_id][0]  > int(content[2]):
-                continue
-            elif int(content[1]) > chromosomes[chromosome_id][1]:
-                continue
-
-            if not content[0] in repeatMask:
-                repeatMask[content[0]] =[]
-            repeatMask[content[0]].append({"id":content[3],"start":int(content[1]),"end":int(content[2])})
     row=1
     detected_splits={}    
 
@@ -510,27 +489,65 @@ def extract_splits(args,ws0):
             if not sucess:
                 contig=""
 
+        distanceA=""
+        distanceB=""
         if sucess and args.repeatmask:
-            args.repeatA= find_repeat(args.chrA,args.posA,repeatMask)
-            args.repeatB= find_repeat(args.chrB,args.posB,repeatMask)
+            args.repeatA,distanceA= find_repeat(args.chrA,args.posA,c)
+            args.repeatB,distanceB= find_repeat(args.chrB,args.posB,c)
 
-        row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,args.chrB,args.posB,args.orientationB,args.repeatB,bp_homology,args.HomologySegments,insertions,insertion_seq,deletions,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
+        row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,distanceA,args.chrB,args.posB,args.orientationB,args.repeatB,distanceB,bp_homology,args.HomologySegments,insertions,insertion_seq,deletions,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
         j=0
         for item in row_content:
 
-            if j in [13,20,21,22]:
+            if j in [15,22,23,24]:
                 ws0.write_rich_text(row, j, item)
             else:
                 ws0.write(row, j, item)
             j+=1
         row += 1
-wb =  xlwt.Workbook()
-ws0 = wb.add_sheet("SplitVision",cell_overwrite_ok=True)
 
-header=["sampleID","variant_id","variant_type","split_reads","ChrA","PosA","OrientationA","repeatA","ChrB","PosB","OrientationB","repeatB","breakpoint_microhomology(bp)","breakpoint_microhomology(sequence)","insertions","insertions(sequence)","deletions","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
-j=0
-for item in header:
-    ws0.write(0, j, item)
-    j += 1
-detected_splits=extract_splits(args,ws0)
-wb.save(os.path.join(args.working_dir,args.sample+".xls"))
+
+
+parser = argparse.ArgumentParser("""SplitVision - SV breakpoint analysis software""")
+parser.add_argument('--analyse',action="store_true",help="analyse breakpoints")
+parser.add_argument('--db',action="store_true",help="generate the repeatmask database")
+args, unknown = parser.parse_known_args()
+
+if args.analyse:
+
+    parser = argparse.ArgumentParser("""SplitVision - SV breakpoint analysis software""")
+    parser.add_argument('--analyse',action="store_true",help="analyse breakpoints")
+    parser.add_argument('--vcf'        , type=str, help="input vcf file containing breakpoints of interest(use only bed or vcf at a time)")
+    parser.add_argument('--bed', type=str, help="input bed file(tab separted) containing the sv breakpoints(format: chrA,posA,chrB,posB)")
+    parser.add_argument('--bam', type=str,required=True ,help="the input bam file")
+    parser.add_argument('--fa', type=str,required=True ,help="the reference fasta file")
+    parser.add_argument('--skip_assembly',required=False, action="store_true",help="skip the assembly analysis")
+    parser.add_argument('--working_dir', type=str ,help="working directory")
+    parser.add_argument('--sample', type=str ,help="sample id")
+    parser.add_argument('--repeatmask', type=str,help="database file generated from the uscs repeat mask")
+    parser.add_argument('--padding', type=int,default=1000 ,help="search for reads mapped within this distance fromt the breakpoint position")
+    args = parser.parse_args()
+    
+    wb =  xlwt.Workbook()
+    ws0 = wb.add_sheet("SplitVision",cell_overwrite_ok=True)
+    
+    header=["sampleID","variant_id","variant_type","split_reads","ChrA","PosA","OrientationA","repeatA","repeat_distance","ChrB","PosB","OrientationB","repeatB","repeat_distance","breakpoint_microhomology(bp)","breakpoint_microhomology(sequence)","insertions","insertions(sequence)","deletions","lengthA","lengthB","contig_length","regionA_sequence","regionB_sequence","contig_sequence"]
+    j=0
+    for item in header:
+        ws0.write(0, j, item)
+        j += 1
+    detected_splits=extract_splits(args,ws0)
+    wb.save(os.path.join(args.working_dir,args.sample+".xls"))
+
+elif args.db:
+    parser = argparse.ArgumentParser("""generate a database of genomic regions""")
+    parser.add_argument('--db',action="store_true",help="generate the databases from input bed files")
+    parser.add_argument('--prefix',type=str,required=True,help="the prefix of the database")
+    parser.add_argument('--tab',type=str,required=True,help="the input repeatmask file")
+    args, unknown = parser.parse_known_args()
+    db(args)
+else:
+    print("invalid option, use --analyse to analyse breakpoints, or --db to generate a repeatmasksk db file")
+
+
+
