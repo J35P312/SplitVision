@@ -37,7 +37,7 @@ def find_snps(chr,pos,c,dist):
         d={}
         for hit in c.execute(A):
             snp_distance.append( abs(pos- int( hit[0] ))  )
-            if hit[0] <= dist:
+            if abs(pos- int( hit[0] )) <= dist:
                 closest_snp.append( "{}:{},{}->{}".format(chr,hit[0],str(hit[1]),str(hit[2])) )
         if snp_distance:
             return( str(min(snp_distance)),"|".join(closest_snp) )
@@ -555,7 +555,7 @@ def extract_splits(args,ws0):
             snpDistanceA,snpsA= find_snps(args.chrA,args.posA,c_snp,args.snp_distance)
             snpDistanceB,snpsB= find_snps(args.chrB,args.posB,c_snp,args.snp_distance)
 
-        row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,distanceA,args.chrB,args.posB,args.orientationB,args.repeatB,distanceB,bp_homology,args.HomologySegments,insertions,insertion_seq,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
+        row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,distanceA,snpsA,snpDistanceA,args.chrB,args.posB,args.orientationB,args.repeatB,distanceB,snpsB,snpDistanceB,bp_homology,args.HomologySegments,insertions,insertion_seq,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
         j=0
         for item in row_content:
 
