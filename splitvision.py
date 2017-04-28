@@ -200,7 +200,7 @@ def retrieve_pos(args,input_file):
             insertion_seq=""
             insertion_range=sorted( list(set(range(1,len(contig)+1)).difference( set(range_secondary).union( set(range_primary) ) )))
             if insertion_range:
-                insertions =1
+                insertions = len(insertion_range)
             for i in range(0,len(insertion_range)):
                 if i == len(insertion_range) -1:
                     insertion_seq +=   contig[ insertion_range[i]-1 ]
@@ -208,7 +208,7 @@ def retrieve_pos(args,input_file):
                     if insertion_range[i] +1 == insertion_range[i+1]:
                         insertion_seq +=   contig[ insertion_range[i]-1 ]
                     else:
-                        insertions += 1
+                        
                         insertion_seq +=   contig[ insertion_range[i]-1 ]  + ","                    
             
 
@@ -258,7 +258,7 @@ def retrieve_pos(args,input_file):
             fontseq = xlwt.easyfont('')
             fontA= xlwt.easyfont('color_index green')
             fontHOM= xlwt.easyfont('color_index red')
-            fontSEQ = xlwt.easyfont('')
+            fontSEQ = xlwt.easyfont('color_index yellow')
             fontB= xlwt.easyfont('color_index blue')
             seq_norm=""
             tupleB=[]
