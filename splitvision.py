@@ -26,24 +26,30 @@ def find_repeat(chr,pos,c):
         if i > 1000:
             return("","")
 
-def find_snps(chr,pos,c,dist):
+def find_snps(chr,pos,dist,bam,wd,ref):
     delta=10000
     i =0
     closest_snp=[]
     snp_distance=[]
-    while True:
-        i +=1
-        A='SELECT pos,ref,alt FROM SVDB WHERE chr == \'{}\' AND pos > {} AND pos < {} '.format(chr,int(pos)-delta,int(pos)+delta)
-        d={}
-        for hit in c.execute(A):
-            snp_distance.append( abs(pos- int( hit[0] ))  )
-            if abs(pos- int( hit[0] )) <= dist:
-                closest_snp.append( "{}:{},{}->{}".format(chr,hit[0],str(hit[1]),str(hit[2])) )
-        if snp_distance:
-            return( str(min(snp_distance)),"|".join(closest_snp) )
-        delta = delta*10
-        if i > 1000:
-            return("","")
+    
+    region_bam=os.path.join(wd,bam)
+    snps=os.path.join(wd,"snps.vcf")
+    os.system("samtools view -bh {} {}:{}-{} > {}".format(bam,chr,pos-dist,pos+dist,region_bam))
+    os.system("samtools mpileup -uf {} {}  | bcftools view -Nvcg - > {}".format(ref,region_bam,snps) )
+    for line in open( snps ):
+        if line[0] == "#":
+            continue
+        content=line.strip().split("\t")
+        snp_pos=content[1]
+        alt=content[4]
+        ref=content[3]
+        snp_distance.append( abs(pos- int( snp_pos ))  )
+        closest_snp.append( "{}-{}-{}-{}".format(chr,snp_pos,ref,alt ))
+
+    if snp_distance:
+        return( str(min(snp_distance)),"|".join(closest_snp) )
+
+    return("> {}".format(dist),"none")
 
 def db(args):
 
@@ -375,39 +381,6 @@ def extract_splits(args,ws0):
         conn = sqlite3.connect(args.repeatmask)
         c = conn.cursor()
 
-    if args.snps:
-        conn_snp=sqlite3.connect(":memory:")
-        c_snp = conn_snp.cursor()
-
-        A="CREATE TABLE SVDB (chr TEXT, pos INT,ref TEXT, alt TEXT)"
-        c_snp.execute(A)
-
-        input_vcf=[]
-
-        if args.snps.endswith('.gz'):
-            opener = gzip.open
-        else:
-            opener = open
-
-
-        for line in opener(args.snps):
-            if line[0] == "#":
-                continue
-            content=line.strip().split()
-            input_vcf.append([ content[0].replace("chr",""), content[1] , content[3] ,content[4] ])                
-            if len(input_vcf) > 1000000:
-                c_snp.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_vcf)          
-                input_vcf=[]
-        if input_vcf:
-            c_snp.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_vcf)
-                    
-
-        A="CREATE INDEX SNP ON SVDB (chr, pos)"
-        c_snp.execute(A)
-        conn_snp.commit()
-
-        
-
     row=1
     detected_splits={}    
 
@@ -547,13 +520,8 @@ def extract_splits(args,ws0):
             distanceA,args.repeatA= find_repeat(args.chrA,args.posA,c)
             distanceB,args.repeatB= find_repeat(args.chrB,args.posB,c)
 
-        snpDistanceA=""
-        snpDistanceB=""
-        snpsA=""
-        snpsB=""
-        if args.snps:
-            snpDistanceA,snpsA= find_snps(args.chrA,args.posA,c_snp,args.snp_distance)
-            snpDistanceB,snpsB= find_snps(args.chrB,args.posB,c_snp,args.snp_distance)
+        snpDistanceA,snpsA= find_snps(args.chrA,args.posA,args.snp_distance,args.bam,wd,args.fa)
+        snpDistanceB,snpsB= find_snps(args.chrB,args.posB,args.snp_distance,args.bam,wd,args.fa)
 
         row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,distanceA,snpsA,snpDistanceA,args.chrB,args.posB,args.orientationB,args.repeatB,distanceB,snpsB,snpDistanceB,bp_homology,args.HomologySegments,insertions,insertion_seq,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
         j=0
@@ -584,7 +552,6 @@ if args.analyse:
     parser.add_argument('--skip_assembly',required=False, action="store_true",help="skip the assembly analysis")
     parser.add_argument('--working_dir', type=str ,help="working directory")
     parser.add_argument('--sample', type=str ,help="sample id")
-    parser.add_argument('--snps', type=str ,help="a vcf file containing snps, the software will compute the distance to the closest snp, and report snps within the snp_distance")
     parser.add_argument('--snp_distance', type=int,default=100 ,help="report snps within this distance ")
     parser.add_argument('--repeatmask', type=str,help="database file generated from the uscs repeat mask")
     parser.add_argument('--padding', type=int,default=1000 ,help="search for reads mapped within this distance fromt the breakpoint position")
