@@ -19,7 +19,10 @@ def find_repeat(chr,pos,c):
             d[ abs(pos- int( hit[0] )) ] = str(hit[2])
             d[ abs(pos- int( hit[1] )) ] = str(hit[2])
             if pos >= int( hit[0]) and pos <= int( hit[1] ):
-                d[0]=str(hit[2])
+                if not 0 in d:
+                    d[0]=str(hit[2])
+                else:
+                    d[0] += "," + str(hit[2])
         if d:
             return( str(min(d)),d[min(d)] )
         delta = delta*10
