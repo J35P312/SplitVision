@@ -32,7 +32,7 @@ def find_snps(chr,pos,dist,bam,wd,ref):
     closest_snp=[]
     snp_distance=[]
     
-    region_bam=os.path.join(wd,bam)
+    region_bam=os.path.join(wd,bam.split("/")[-1])
     snps=os.path.join(wd,"snps.vcf")
     os.system("samtools view -bh {} {}:{}-{} > {}".format(bam,chr,pos-dist,pos+dist,region_bam))
     os.system("samtools mpileup -uf {} {}  | bcftools view -Nvcg - > {}".format(ref,region_bam,snps) )
