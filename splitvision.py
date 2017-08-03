@@ -27,15 +27,16 @@ def find_repeat(chr,pos,c):
             return("","")
 
 def find_snps(chr,pos,dist,bam,wd,ref):
-    delta=10000
-    i =0
     closest_snp=[]
     snp_distance=[]
     
     region_bam=os.path.join(wd,bam.split("/")[-1])
-    snps=os.path.join(wd,"snps.vcf")
+    snps=os.path.join(wd,"snps")
     os.system("samtools view -bh {} {}:{}-{} > {}".format(bam,chr,pos-dist,pos+dist,region_bam))
-    os.system("samtools mpileup -uf {} {}  | bcftools view -Nvcg - > {}".format(ref,region_bam,snps) )
+    os.system("samtools mpileup -uf {} {}  | bcftools view -Nvcg - > {}.raw.vcf".format(ref,region_bam,snps) )
+    os.system("vt decompose {}.raw.vcf -o {}.decomposed.vcf".format(snps,snps))
+    os.system("vt normalize {}.decomposed.vcf -r {} -o {}.vcf".format(snps,ref,snps))
+
     for line in open( snps ):
         if line[0] == "#":
             continue
