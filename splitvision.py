@@ -37,7 +37,7 @@ def find_snps(chr,pos,dist,bam,wd,ref):
     os.system("vt decompose {}.raw.vcf -o {}.decomposed.vcf".format(snps,snps))
     os.system("vt normalize {}.decomposed.vcf -r {} -o {}.vcf".format(snps,ref,snps))
 
-    for line in open( snps ):
+    for line in open( snps+".vcf" ):
         if line[0] == "#":
             continue
         content=line.strip().split("\t")
