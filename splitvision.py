@@ -32,8 +32,7 @@ def find_snps(chr,pos,dist,bam,wd,ref):
     
     region_bam=os.path.join(wd,bam.split("/")[-1])
     snps=os.path.join(wd,"snps")
-    os.system("samtools view -bh {} {}:{}-{} > {}".format(bam,chr,pos-dist,pos+dist,region_bam))
-    os.system("samtools mpileup -uf {} {}  | bcftools view -Nvcg - > {}.raw.vcf".format(ref,region_bam,snps) )
+    os.system("freebayes -f {} {} -r  {}:{}-{} > {}.raw.vcf".format(ref,bam,chr,pos-dist,pos+dist,snps) )
     os.system("vt decompose {}.raw.vcf -o {}.decomposed.vcf".format(snps,snps))
     os.system("vt normalize {}.decomposed.vcf -r {} -o {}.vcf".format(snps,ref,snps))
 
@@ -450,51 +449,20 @@ def extract_splits(args,ws0):
         deletions=""
         sucess = False
 
-        if args.skip_assembly and found:
+        if found:
             wd=os.path.join(args.working_dir,var_id)
-            target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
-            for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
-                content= line.strip().split("\t")
-                flag="{0:012b}".format(int(content[1]))
-                if not int(flag[-9]) and not int(flag[0]) and not int(flag[1]) and not int(flag[2]):
-                   target.write( ">" + content[0] + "\n")
-                   target.write(content[9] + "\n")
-                   splits += 1
-            target.close()
+            softclips=os.path.join(wd,"splits.sam")
+            print "python consensus.py {} {} > {}/consensus.fa".format(wd,softclips,wd)
+            os.system("python consensus.py {} {} > {}/consensus.fa".format(wd,softclips,wd))
+            for line in open("{}/consensus.fa".format(wd)):
+                splits=int(line.strip().split()[2])
+                break
 
             try:
-                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
+                os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"consensus.fa"),os.path.join(wd,"aligned_consensus.sam")))
+                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_consensus.sam"))
             except:
                 homology_seq="WARNING:unable to determine the breakpoint sequence"   
-
-        elif found:
-            wd=os.path.join(args.working_dir,var_id)
-            target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
-            for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
-                content= line.strip().split("\t")
-                flag="{0:012b}".format(int(content[1]))
-                if not int(flag[-9]) and not int(flag[0]) and not int(flag[1]) and not int(flag[2]):
-                   target.write( ">" + content[0] + "\n")
-                   target.write(content[9] + "\n")
-                   splits += 1
-            target.close()
-            trials=[20,60,90]
-            for k in trials:
-                os.system("ABYSS -c {} -e {} -k {} -o {}_{}.fa {} > /dev/null 2>&1".format(1,0,k,os.path.join(args.working_dir,var_id,"abyss"),k,os.path.join(wd,"softclip.fa") ))
-            os.system("cat {}_20.fa {}_60.fa {}_90.fa > {}".format(os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss")   ,os.path.join(args.working_dir,var_id,"abyss.fa")))
-
-            if not os.stat( os.path.join(args.working_dir,var_id,"abyss.fa") ).st_size == 0:
-                os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"aligned_contig.sam")))
-                try:
-                    args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_contig.sam"))
-                except:
-                    pass
-            if not sucess:
-
-                try:
-                    args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
-                except:
-                    homology_seq="WARNING:unable to determine the breakpoint sequence"
         else:
             wd=os.path.join(args.working_dir,var_id)
             os.system("samtools view -bh {} {}:{}-{} > {}/regionA.bam".format(args.bam,args.chrA,args.posA-args.padding,args.posA+args.padding,wd))
@@ -550,7 +518,6 @@ if args.analyse:
     parser.add_argument('--bed', type=str, help="input bed file(tab separted) containing the sv breakpoints(format: chrA,posA,chrB,posB)")
     parser.add_argument('--bam', type=str,required=True ,help="the input bam file")
     parser.add_argument('--fa', type=str,required=True ,help="the reference fasta file")
-    parser.add_argument('--skip_assembly',required=False, action="store_true",help="skip the assembly analysis")
     parser.add_argument('--working_dir', type=str ,help="working directory")
     parser.add_argument('--sample', type=str ,help="sample id")
     parser.add_argument('--snp_distance', type=int,default=100 ,help="report snps within this distance ")
