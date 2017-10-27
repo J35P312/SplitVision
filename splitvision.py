@@ -29,24 +29,30 @@ def find_repeat(chr,pos,c):
         if i > 1000:
             return("","")
 
-def find_snps(chr,pos,c,dist):
-    delta=10000
-    i =0
+def find_snps(chr,pos,dist,bam,wd,ref):
     closest_snp=[]
     snp_distance=[]
-    while True:
-        i +=1
-        A='SELECT pos,ref,alt FROM SVDB WHERE chr == \'{}\' AND pos > {} AND pos < {} '.format(chr,int(pos)-delta,int(pos)+delta)
-        d={}
-        for hit in c.execute(A):
-            snp_distance.append( abs(pos- int( hit[0] ))  )
-            if abs(pos- int( hit[0] )) <= dist:
-                closest_snp.append( "{}:{},{}->{}".format(chr,hit[0],str(hit[1]),str(hit[2])) )
-        if snp_distance:
-            return( str(min(snp_distance)),"|".join(closest_snp) )
-        delta = delta*10
-        if i > 1000:
-            return("","")
+    
+    region_bam=os.path.join(wd,bam.split("/")[-1])
+    snps=os.path.join(wd,"snps")
+    os.system("freebayes -f {} {} -r  {}:{}-{} > {}.raw.vcf".format(ref,bam,chr,pos-dist,pos+dist,snps) )
+    os.system("vt decompose {}.raw.vcf -o {}.decomposed.vcf".format(snps,snps))
+    os.system("vt normalize {}.decomposed.vcf -r {} -o {}.vcf".format(snps,ref,snps))
+
+    for line in open( snps+".vcf" ):
+        if line[0] == "#":
+            continue
+        content=line.strip().split("\t")
+        snp_pos=content[1]
+        alt=content[4]
+        ref=content[3]
+        snp_distance.append( abs(pos- int( snp_pos ))  )
+        closest_snp.append( "{}-{}-{}-{}".format(chr,snp_pos,ref,alt ))
+
+    if snp_distance:
+        return( str(min(snp_distance)),"|".join(closest_snp) )
+
+    return("> {}".format(dist),"none")
 
 def db(args):
 
@@ -378,39 +384,6 @@ def extract_splits(args,ws0):
         conn = sqlite3.connect(args.repeatmask)
         c = conn.cursor()
 
-    if args.snps:
-        conn_snp=sqlite3.connect(":memory:")
-        c_snp = conn_snp.cursor()
-
-        A="CREATE TABLE SVDB (chr TEXT, pos INT,ref TEXT, alt TEXT)"
-        c_snp.execute(A)
-
-        input_vcf=[]
-
-        if args.snps.endswith('.gz'):
-            opener = gzip.open
-        else:
-            opener = open
-
-
-        for line in opener(args.snps):
-            if line[0] == "#":
-                continue
-            content=line.strip().split()
-            input_vcf.append([ content[0].replace("chr",""), content[1] , content[3] ,content[4] ])                
-            if len(input_vcf) > 1000000:
-                c_snp.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_vcf)          
-                input_vcf=[]
-        if input_vcf:
-            c_snp.executemany('INSERT INTO SVDB VALUES (?,?,?,?)',input_vcf)
-                    
-
-        A="CREATE INDEX SNP ON SVDB (chr, pos)"
-        c_snp.execute(A)
-        conn_snp.commit()
-
-        
-
     row=1
     detected_splits={}    
 
@@ -479,51 +452,20 @@ def extract_splits(args,ws0):
         deletions=""
         sucess = False
 
-        if args.skip_assembly and found:
+        if found:
             wd=os.path.join(args.working_dir,var_id)
-            target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
-            for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
-                content= line.strip().split("\t")
-                flag="{0:012b}".format(int(content[1]))
-                if not int(flag[-9]) and not int(flag[0]) and not int(flag[1]) and not int(flag[2]):
-                   target.write( ">" + content[0] + "\n")
-                   target.write(content[9] + "\n")
-                   splits += 1
-            target.close()
+            softclips=os.path.join(wd,"splits.sam")
+            print "python consensus.py {} {} > {}/consensus.fa".format(wd,softclips,wd)
+            os.system("python consensus.py {} {} > {}/consensus.fa".format(wd,softclips,wd))
+            for line in open("{}/consensus.fa".format(wd)):
+                splits=int(line.strip().split()[2])
+                break
 
             try:
-                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
+                os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"consensus.fa"),os.path.join(wd,"aligned_consensus.sam")))
+                args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_consensus.sam"))
             except:
                 homology_seq="WARNING:unable to determine the breakpoint sequence"   
-
-        elif found:
-            wd=os.path.join(args.working_dir,var_id)
-            target = open(args.working_dir + "/" + var_id +"/" + "softclip.fa", 'w')
-            for line in open(os.path.join(args.working_dir,var_id,"splits.sam")):
-                content= line.strip().split("\t")
-                flag="{0:012b}".format(int(content[1]))
-                if not int(flag[-9]) and not int(flag[0]) and not int(flag[1]) and not int(flag[2]):
-                   target.write( ">" + content[0] + "\n")
-                   target.write(content[9] + "\n")
-                   splits += 1
-            target.close()
-            trials=[20,60,90]
-            for k in trials:
-                os.system("ABYSS -c {} -e {} -k {} -o {}_{}.fa {} > /dev/null 2>&1".format(1,0,k,os.path.join(args.working_dir,var_id,"abyss"),k,os.path.join(wd,"softclip.fa") ))
-            os.system("cat {}_20.fa {}_60.fa {}_90.fa > {}".format(os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss")   ,os.path.join(args.working_dir,var_id,"abyss.fa")))
-
-            if not os.stat( os.path.join(args.working_dir,var_id,"abyss.fa") ).st_size == 0:
-                os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"abyss.fa"),os.path.join(wd,"aligned_contig.sam")))
-                try:
-                    args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_contig.sam"))
-                except:
-                    pass
-            if not sucess:
-
-                try:
-                    args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"splits.sam"))
-                except:
-                    homology_seq="WARNING:unable to determine the breakpoint sequence"
         else:
             wd=os.path.join(args.working_dir,var_id)
             os.system("samtools view -bh {} {}:{}-{} > {}/regionA.bam".format(args.bam,args.chrA,args.posA-args.padding,args.posA+args.padding,wd))
@@ -550,13 +492,8 @@ def extract_splits(args,ws0):
             distanceA,args.repeatA= find_repeat(args.chrA,args.posA,c)
             distanceB,args.repeatB= find_repeat(args.chrB,args.posB,c)
 
-        snpDistanceA=""
-        snpDistanceB=""
-        snpsA=""
-        snpsB=""
-        if args.snps:
-            snpDistanceA,snpsA= find_snps(args.chrA,args.posA,c_snp,args.snp_distance)
-            snpDistanceB,snpsB= find_snps(args.chrB,args.posB,c_snp,args.snp_distance)
+        snpDistanceA,snpsA= find_snps(args.chrA,args.posA,args.snp_distance,args.bam,wd,args.fa)
+        snpDistanceB,snpsB= find_snps(args.chrB,args.posB,args.snp_distance,args.bam,wd,args.fa)
 
         row_content=[args.sample,var_id,args.type,splits,args.chrA,args.posA,args.orientationA,args.repeatA,distanceA,snpsA,snpDistanceA,args.chrB,args.posB,args.orientationB,args.repeatB,distanceB,snpsB,snpDistanceB,bp_homology,args.HomologySegments,insertions,insertion_seq,args.lengthA,args.lengthB,len(contig),args.regionAsegments,args.regionBsegments,args.contigSegments]
         j=0
@@ -584,10 +521,8 @@ if args.analyse:
     parser.add_argument('--bed', type=str, help="input bed file(tab separted) containing the sv breakpoints(format: chrA,posA,chrB,posB)")
     parser.add_argument('--bam', type=str,required=True ,help="the input bam file")
     parser.add_argument('--fa', type=str,required=True ,help="the reference fasta file")
-    parser.add_argument('--skip_assembly',required=False, action="store_true",help="skip the assembly analysis")
     parser.add_argument('--working_dir', type=str ,help="working directory")
     parser.add_argument('--sample', type=str ,help="sample id")
-    parser.add_argument('--snps', type=str ,help="a vcf file containing snps, the software will compute the distance to the closest snp, and report snps within the snp_distance")
     parser.add_argument('--snp_distance', type=int,default=100 ,help="report snps within this distance ")
     parser.add_argument('--repeatmask', type=str,help="database file generated from the uscs repeat mask")
     parser.add_argument('--padding', type=int,default=1000 ,help="search for reads mapped within this distance fromt the breakpoint position")
