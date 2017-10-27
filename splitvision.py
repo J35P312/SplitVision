@@ -19,14 +19,11 @@ def find_repeat(chr,pos,c):
             d[ abs(pos- int( hit[0] )) ] = str(hit[2])
             d[ abs(pos- int( hit[1] )) ] = str(hit[2])
             if pos >= int( hit[0]) and pos <= int( hit[1] ):
-                if not 0 in d:
-                    d[0]=str(hit[2])
-                else:
-                    d[0] += "," + str(hit[2])
+                d[0]=str(hit[2])
         if d:
             return( str(min(d)),d[min(d)] )
         delta = delta*10
-        if i > 1000:
+        if i > 2:
             return("","")
 
 def find_snps(chr,pos,dist,bam,wd,ref):
@@ -193,18 +190,25 @@ def retrieve_pos(args,input_file):
             deletions += cigar_del
             insertions += cigar_ins
 
-            posA=int(content[3])+length-1
-            posB=SA_start
-            if clip_after:
+            start_primary=min(range_primary)
+            start_secondary=min(range_secondary)
+            if orientationB != orientationA:
+                start_secondary=len(contig)-max(range_secondary)+1
+
+            if start_primary < start_secondary:
                posA=int(content[3])+length-1
             else:
                posA=int(content[3])
 
-            if SA_clip_after:
+            start_primary=min(range_primary)
+            start_secondary=min(range_secondary)
+            if orientationB != orientationA:
+                start_primary=len(contig)-max(range_primary)+1
+
+            if start_secondary < start_primary:
                posB=SA_end
             else:
                posB=SA_start
-
 
             if orientationB != orientationA:
                 for i in range(0,len(range_secondary)):
@@ -451,7 +455,7 @@ def extract_splits(args,ws0):
         insertions=""
         deletions=""
         sucess = False
-
+        print found
         if found:
             wd=os.path.join(args.working_dir,var_id)
             softclips=os.path.join(wd,"splits.sam")
@@ -459,21 +463,24 @@ def extract_splits(args,ws0):
             os.system("python consensus.py {} {} > {}/consensus.fa".format(wd,softclips,wd))
             for line in open("{}/consensus.fa".format(wd)):
                 splits=int(line.strip().split()[2])
+                print splits
                 break
 
             try:
                 os.system("bwa mem {} {} > {}".format(args.fa,os.path.join(args.working_dir,var_id,"consensus.fa"),os.path.join(wd,"aligned_consensus.sam")))
                 args,sucess,contig,bp_homology,homology_seq,insertions,insertion_seq,deletions = retrieve_pos(args,os.path.join(args.working_dir,var_id,"aligned_consensus.sam"))
+                print success
             except:
                 homology_seq="WARNING:unable to determine the breakpoint sequence"   
         else:
             wd=os.path.join(args.working_dir,var_id)
-            os.system("samtools view -bh {} {}:{}-{} > {}/regionA.bam".format(args.bam,args.chrA,args.posA-args.padding,args.posA+args.padding,wd))
-            os.system("samtools view -bh {} {}:{}-{} > {}/regionB.bam".format(args.bam,args.chrB,args.posB-args.padding,args.posB+args.padding,wd))
-            os.system("samtools merge -f {}/region.bam {}/regionA.bam {}/regionB.bam ".format(wd,wd,wd))
-            os.system("samtools bam2fq {}/region.bam > {}/region.fq".format(wd,wd))
+            os.system("samtools view {} {}:{}-{} > {}/regionA.sam".format(args.bam,args.chrA,args.posA-args.padding,args.posA+args.padding,wd))
+            os.system("samtools view {} {}:{}-{} > {}/regionB.sam".format(args.bam,args.chrB,args.posB-args.padding,args.posB+args.padding,wd))
+            os.system("cat {}/regionA.sam {}/regionB.sam > {}/region.sam".format(wd,wd,wd))
+            os.system("python bam2fa.py {}/region.sam > {}/region.fq".format(wd,wd))
             trials=[20,60,90]
             for k in trials:
+                print "ABYSS -c {} -e {} -k {} -o {}_{}.fa {} > /dev/null 2>&1".format(1,10,k,os.path.join(args.working_dir,var_id,"abyss"),k,os.path.join(wd,"region.fq") )
                 os.system("ABYSS -c {} -e {} -k {} -o {}_{}.fa {} > /dev/null 2>&1".format(1,10,k,os.path.join(args.working_dir,var_id,"abyss"),k,os.path.join(wd,"region.fq") ))
             os.system("cat {}_20.fa {}_60.fa {}_90.fa > {}".format(os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss"),os.path.join(args.working_dir,var_id,"abyss")   ,os.path.join(args.working_dir,var_id,"abyss.fa")))
 

@@ -23,35 +23,37 @@ def get_sam_data(line):
 def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir,it):
     bam_prefix=bam.split("/")[-1]
     prefix=working_dir + "/" +  bam_prefix[0:-4]
-    os.system("samtools view {} {}:{}-{} | grep \"SA:\" | grep -E \":{},|;{},\" > {}_test.sam".format(bam,chrA,startA,stopA,chrB,chrB,prefix))
-    print "samtools view {} {}:{}-{} | grep \"SA:\" | grep -E \":{},|;{},\" > {}_test.sam".format(bam,chrA,startA,stopA,chrB,chrB,prefix)
+    print "samtools view -h -F 256  {} {}:{}-{} | samtools view -Sh -F 512 - | samtools view -Sh -F 1024 - | samtools view -S -F 2048 - | grep S > {}_test.sam".format(bam,chrA,startA,stopA,chrB,chrB,prefix)
+    os.system("samtools view -h -F 256  {} {}:{}-{} | samtools view -Sh -F 512 - | samtools view -Sh -F 1024 - | samtools view -S -F 2048 - | grep S  > {}_test.sam".format(bam,chrA,startA,stopA,prefix))
     print("{},{}:{},{}".format(startA,stopA,startB,stopB))
     splits=[]        
     found = False
     for line in open("{}_test.sam".format(prefix)):
-        SA_line=line.strip().split("SA:Z:")[-1].split("\t")[0]
-        SA_fields=SA_line.strip(";").split(";")
-        for SA in SA_fields:
-            #print SA
-            split_read=SA.split(",")
-            #print split_read
-            pos = int(split_read[1])
-            #print  "{} {} {}".format(pos,startB,stopB)
-            if split_read[0] == chrB and pos >= startB and pos <= stopB:
-                found = True
-                splits.append(line.strip() +"\n")
-                continue
+        content=line.strip().split()
+        if "SA:Z" in line and not "H" in content[5]: 
+            SA_line=line.strip().split("SA:Z:")[-1].split("\t")[0]
+            SA_fields=SA_line.strip(";").split(";")
+            for SA in SA_fields:
+                #print SA
+                split_read=SA.split(",")
+                #print split_read
+                pos = int(split_read[1])
+                #print  "{} {} {}".format(pos,startB,stopB)
+                if split_read[0] == chrB and pos >= startB and pos <= stopB:
+                    found = True
+                    splits.append(line.strip() +"\n")
+                    continue
            
-            SC = ["".join(x) for _, x in itertools.groupby(SA, key=str.isdigit)]
-            length=0
-            for i in range(0,len(SC)/2):
-                if SC[i*2+1] == "M":
-                   length += int( SC[i*2] )
+                SC = ["".join(x) for _, x in itertools.groupby(SA, key=str.isdigit)]
+                length=0
+                for i in range(0,len(SC)/2):
+                    if SC[i*2+1] == "M":
+                        length += int( SC[i*2] )
 
-            if split_read[0] == chrB and pos+length >= startB and pos+length <= stopB:
-                found = True
-                splits.append(line.strip() +"\n")
-
+                if split_read[0] == chrB and pos+length >= startB and pos+length <= stopB:
+                    found = True
+                    splits.append(line.strip() +"\n")
+            
     os.system("samtools view -H {} > {}_header.sam".format(bam,prefix))
 
     target = open(working_dir +"/" + "splits.sam", 'w')
