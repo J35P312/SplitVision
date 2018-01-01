@@ -1,6 +1,6 @@
 import sys
 import os
-clustal="clustalw"
+clustal="clustalw2"
 cdhit="cd-hit"
 
 def cluster(cdhit,folder,softclipfa):
