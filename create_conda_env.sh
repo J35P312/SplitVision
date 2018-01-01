@@ -1,4 +1,3 @@
-cd $1
 conda config --add channels r
 conda config --add channels bioconda
 
