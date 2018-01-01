@@ -1,7 +1,7 @@
 import sys
 import os
-clustal="clustalw2"
-cdhit="/home/jesperei/cdhit/cd-hit"
+clustal="clustalw"
+cdhit="cd-hit"
 
 def cluster(cdhit,folder,softclipfa):
     #cluster the reads, and analyse the reads belonging to the largest cluster
