@@ -10,11 +10,11 @@ First activate the conda environment
 
 To analyse the breakpoints in a vcf:
 
-    python splitvision.py --analyse --vcf input.vcf --bam input.bam --fa ref.fasta --db repeats.db --working_dir output
+    python splitvision.py --analyse --vcf input.vcf --bam input.bam --fa ref.fasta --repeatmask repeats.db --working_dir output
 
 To analyse the breakpoints in a bedpe file:
 
-    python splitvision.py --analyse --vcf input.tab --bam input.bam --fa ref.fasta --db repeats.db --working_dir output
+    python splitvision.py --analyse --vcf input.tab --bam input.bam --fa ref.fasta --repeatmask repeats.db --working_dir output
 
 To generate a database of repeats:
 
