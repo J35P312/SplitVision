@@ -23,9 +23,7 @@ def get_sam_data(line):
 def find_variants(bam,chrA,startA,stopA,chrB,startB,stopB,working_dir,it):
     bam_prefix=bam.split("/")[-1]
     prefix=working_dir + "/" +  bam_prefix[0:-4]
-    print "samtools view -h -F 256  {} {}:{}-{} | samtools view -Sh -F 512 - | samtools view -Sh -F 1024 - | samtools view -S -F 2048 - | grep S > {}_test.sam".format(bam,chrA,startA,stopA,chrB,chrB,prefix)
     os.system("samtools view -h -F 256  {} {}:{}-{} | samtools view -Sh -F 512 - | samtools view -Sh -F 1024 - | samtools view -S -F 2048 - | grep S  > {}_test.sam".format(bam,chrA,startA,stopA,prefix))
-    print("{},{}:{},{}".format(startA,stopA,startB,stopB))
     splits=[]        
     found = False
     for line in open("{}_test.sam".format(prefix)):
